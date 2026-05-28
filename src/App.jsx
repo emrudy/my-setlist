@@ -323,8 +323,8 @@ export default function App() {
                   style={{borderBottom:idx<displayed.length-1?`1px solid ${tk.border}`:"none",transition:"background 0.12s",cursor:"pointer"}}
                   onClick={()=>setExpandedId(isExpanded?null:song.id)}>
 
-                  {/* Main row */}
-                  <div style={{display:"flex",alignItems:"center",gap:isMobile?12:16,padding:isMobile?"13px 14px":"14px 20px"}}>
+                  {/* Main row — grid ensures titles always start at same pixel */}
+                  <div style={{display:"grid",gridTemplateColumns:`${isMobile?42:48}px 1fr ${isMobile?"auto":"200px"}`,alignItems:"center",gap:isMobile?12:16,padding:isMobile?"13px 14px":"14px 20px"}}>
 
                     {/* Quality ring — fixed width */}
                     <div style={{width:isMobile?42:48,height:isMobile?42:48,borderRadius:"50%",background:`conic-gradient(${qColor} ${song.quality*36}deg, ${dark?"#28282a":"#e5e5ea"} 0deg)`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
@@ -339,8 +339,8 @@ export default function App() {
                       <div style={{fontSize:13,color:tk.textSub,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{song.artist}</div>
                     </div>
 
-                    {/* Badges — fixed width so title column is always same width */}
-                    <div style={{display:"flex",gap:6,alignItems:"center",flexShrink:0,width:isMobile?undefined:200,justifyContent:"flex-end"}}>
+                    {/* Badges */}
+                    <div style={{display:"flex",gap:6,alignItems:"center",justifyContent:"flex-end"}}>
                       {!isMobile && (
                         <div style={{fontSize:11,fontWeight:600,color:qColor,background:qColor+"1a",borderRadius:20,padding:"3px 10px",letterSpacing:0.1,whiteSpace:"nowrap",minWidth:90,textAlign:"center"}}>{qualityLabel(song.quality)}</div>
                       )}
