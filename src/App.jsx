@@ -333,10 +333,10 @@ export default function App() {
                       </div>
                     </div>
 
-                    {/* Title / artist — left aligned, flex:1 so it fills remaining space evenly */}
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:isMobile?15:16,fontWeight:600,color:tk.text,letterSpacing:-0.3,marginBottom:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{song.title}</div>
-                      <div style={{fontSize:13,color:tk.textSub,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{song.artist}</div>
+                    {/* Title / artist — explicitly left aligned */}
+                    <div style={{minWidth:0,textAlign:"left"}}>
+                      <div style={{fontSize:isMobile?15:16,fontWeight:600,color:tk.text,letterSpacing:-0.3,marginBottom:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",textAlign:"left"}}>{song.title}</div>
+                      <div style={{fontSize:13,color:tk.textSub,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",textAlign:"left"}}>{song.artist}</div>
                     </div>
 
                     {/* Badges */}
