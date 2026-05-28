@@ -1,9 +1,15 @@
-import { useState, useEffect, useMemo } from "react";
-import { db } from "./firebase";
-import { collection, onSnapshot, doc, setDoc, deleteDoc } from "firebase/firestore";
+import { useState, useEffect, useMemo, useRef } from "react";
 
-// ── Settings persistence (localStorage is fine for UI prefs) ──────────────
+// ── Persistence ────────────────────────────────────────────────────────────
+const STORAGE_KEY = "arco_setlist_v1";
 const SETTINGS_KEY = "arco_setlist_settings_v1";
+
+const loadSongs = () => {
+  try { const d = localStorage.getItem(STORAGE_KEY); return d ? JSON.parse(d) : null; } catch { return null; }
+};
+const saveSongs = (songs) => {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(songs)); } catch {}
+};
 const loadSettings = () => {
   try { const d = localStorage.getItem(SETTINGS_KEY); return d ? JSON.parse(d) : null; } catch { return null; }
 };
@@ -11,23 +17,23 @@ const saveSettings = (s) => {
   try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); } catch {}
 };
 
-// ── Default data (only shown before Firestore loads) ──────────────────────
+// ── Default data ───────────────────────────────────────────────────────────
 const DEFAULT_SONGS = [
-  { id:"1", title:"Canon in D", artist:"Pachelbel", adjustableVolume:true,  quality:9, notes:"Great opener. Crowd favorite." },
-  { id:"2", title:"A Thousand Years", artist:"Christina Perri", adjustableVolume:true,  quality:10, notes:"Bridal processional staple." },
-  { id:"3", title:"Clair de Lune", artist:"Debussy", adjustableVolume:false, quality:8, notes:"Need more practice on the bridge." },
-  { id:"4", title:"At Last", artist:"Etta James", adjustableVolume:true,  quality:7, notes:"Unity candle or cocktail hour." },
-  { id:"5", title:"Signed, Sealed, Delivered", artist:"Stevie Wonder", adjustableVolume:true,  quality:9, notes:"Recessional energy is perfect." },
+  { id:1, title:"Canon in D", artist:"Pachelbel", adjustableVolume:true,  quality:9, notes:"Great opener. Crowd favorite." },
+  { id:2, title:"A Thousand Years", artist:"Christina Perri", adjustableVolume:true,  quality:10, notes:"Bridal processional staple." },
+  { id:3, title:"Clair de Lune", artist:"Debussy", adjustableVolume:false, quality:8, notes:"Need more practice on the bridge." },
+  { id:4, title:"At Last", artist:"Etta James", adjustableVolume:true,  quality:7, notes:"Unity candle or cocktail hour." },
+  { id:5, title:"Signed, Sealed, Delivered", artist:"Stevie Wonder", adjustableVolume:true,  quality:9, notes:"Recessional energy is perfect." },
 ];
 
 // ── Accent presets ─────────────────────────────────────────────────────────
 const ACCENTS = [
-  { id:"blue",    label:"Blue",     color:"#0071e3" },
-  { id:"rose",    label:"Rose",     color:"#e3406b" },
-  { id:"violet",  label:"Violet",   color:"#7c3aed" },
-  { id:"sage",    label:"Sage",     color:"#2d8c5e" },
-  { id:"amber",   label:"Amber",    color:"#c97200" },
-  { id:"graphite",label:"Graphite", color:"#475569" },
+  { id:"blue",   label:"Blue",   color:"#0071e3" },
+  { id:"rose",   label:"Rose",   color:"#e3406b" },
+  { id:"violet", label:"Violet", color:"#7c3aed" },
+  { id:"sage",   label:"Sage",   color:"#2d8c5e" },
+  { id:"amber",  label:"Amber",  color:"#c97200" },
+  { id:"graphite",label:"Graphite",color:"#475569"},
 ];
 
 const lighten = (hex, amt=0.45) => {
@@ -37,11 +43,10 @@ const lighten = (hex, amt=0.45) => {
 
 // ── Quality helpers ────────────────────────────────────────────────────────
 const qualityLabel = (q) => {
-  if (q <= 4) return "Not Ready";
-  if (q <= 7) return "Needs Work";
+  if (q <= 4)  return "Not Ready";
+  if (q <= 7)  return "Needs Work";
   return "Ready";
 };
-
 // Fixed stage colors: Rose / Amber / Sage
 const STAGE_COLORS = { notready:"#e3406b", needswork:"#c97200", ready:"#2d8c5e" };
 const qualityColor = (q) => {
@@ -51,7 +56,7 @@ const qualityColor = (q) => {
 };
 
 let _id = Date.now();
-const newId = () => String(++_id);
+const newId = () => ++_id;
 
 // ── Tokens ─────────────────────────────────────────────────────────────────
 const makeTokens = (accent, dark) => {
@@ -81,24 +86,21 @@ const makeTokens = (accent, dark) => {
 };
 
 export default function App() {
-
   // ── State ──────────────────────────────────────────────────────────────
-  const [songs, setSongs]             = useState(DEFAULT_SONGS);
-  const [loading, setLoading]         = useState(true);
-  const [dark, setDark]               = useState(() => loadSettings()?.dark ?? false);
-  const [accentId, setAccentId]       = useState(() => loadSettings()?.accentId ?? "blue");
+  const [songs, setSongs] = useState(() => loadSongs() || DEFAULT_SONGS);
+  const [dark, setDark] = useState(() => loadSettings()?.dark ?? false);
+  const [accentId, setAccentId] = useState(() => loadSettings()?.accentId ?? "blue");
   const [customAccent, setCustomAccent] = useState(() => loadSettings()?.customAccent ?? "#0071e3");
-  const [search, setSearch]           = useState("");
-  const [sortBy, setSortBy]           = useState("title");
-  const [filterVolume, setFilterVolume] = useState("all");
-  const [filterStage, setFilterStage]   = useState("all");
-  const [showForm, setShowForm]       = useState(false);
-  const [editSong, setEditSong]       = useState(null);
+  const [search, setSearch] = useState("");
+  const [sortBy, setSortBy] = useState("title"); // title | quality | artist
+  const [filterVolume, setFilterVolume] = useState("all"); // all | yes | no
+  const [filterStage, setFilterStage] = useState("all");   // all | notready | needswork | ready
+  const [showForm, setShowForm] = useState(false);
+  const [editSong, setEditSong] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
-  const [expandedId, setExpandedId]   = useState(null);
-  const [windowWidth, setWindowWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1200);
+  const [expandedId, setExpandedId] = useState(null);
+  const [windowWidth, setWindowWidth] = useState(typeof window!=="undefined"?window.innerWidth:1200);
 
-  // ── Window resize ─────────────────────────────────────────────────────
   useEffect(() => {
     const h = () => setWindowWidth(window.innerWidth);
     window.addEventListener("resize", h);
@@ -106,21 +108,11 @@ export default function App() {
   }, []);
   const isMobile = windowWidth < 768;
 
-  // ── Firestore real-time listener ──────────────────────────────────────
-  useEffect(() => {
-    const unsub = onSnapshot(collection(db, "songs"), (snap) => {
-      if (!snap.empty) {
-        setSongs(snap.docs.map(d => ({ ...d.data(), id: d.id })));
-      }
-      setLoading(false);
-    });
-    return () => unsub();
-  }, []);
-
-  // ── Persist UI settings to localStorage ──────────────────────────────
+  // ── Persist ──────────────────────────────────────────────────────────
+  useEffect(() => { saveSongs(songs); }, [songs]);
   useEffect(() => { saveSettings({ dark, accentId, customAccent }); }, [dark, accentId, customAccent]);
 
-  const accent = accentId === "custom" ? customAccent : (ACCENTS.find(a => a.id === accentId) || ACCENTS[0]).color;
+  const accent = accentId === "custom" ? customAccent : (ACCENTS.find(a=>a.id===accentId)||ACCENTS[0]).color;
   const tk = useMemo(() => makeTokens(accent, dark), [accent, dark]);
 
   // ── Filtered / sorted list ────────────────────────────────────────────
@@ -135,7 +127,7 @@ export default function App() {
     if (filterStage === "notready")  list = list.filter(s => s.quality <= 4);
     if (filterStage === "needswork") list = list.filter(s => s.quality >= 5 && s.quality <= 7);
     if (filterStage === "ready")     list = list.filter(s => s.quality >= 8);
-    list.sort((a, b) => {
+    list.sort((a,b) => {
       if (sortBy === "quality") return b.quality - a.quality;
       if (sortBy === "artist")  return a.artist.localeCompare(b.artist);
       return a.title.localeCompare(b.title);
@@ -143,46 +135,33 @@ export default function App() {
     return list;
   }, [songs, search, sortBy, filterVolume, filterStage]);
 
-  // ── Song CRUD (all writes go to Firestore) ────────────────────────────
+  // ── Song CRUD ────────────────────────────────────────────────────────
   const openNew  = () => { setEditSong({ id:newId(), title:"", artist:"", adjustableVolume:true, quality:7, notes:"" }); setShowForm(true); };
   const openEdit = (s) => { setEditSong({...s}); setShowForm(true); };
-  const updEdit  = (f, v) => setEditSong(s => ({ ...s, [f]: v }));
-
-  const saveSong = async () => {
+  const saveSong = () => {
     if (!editSong.title.trim()) return alert("Song title is required.");
-    await setDoc(doc(db, "songs", String(editSong.id)), editSong);
-    setShowForm(false);
-    setEditSong(null);
+    setSongs(prev => prev.find(s=>s.id===editSong.id) ? prev.map(s=>s.id===editSong.id?editSong:s) : [...prev,editSong]);
+    setShowForm(false); setEditSong(null);
   };
+  const deleteSong = (id) => { if (confirm("Remove this song?")) setSongs(prev=>prev.filter(s=>s.id!==id)); };
+  const updEdit = (f,v) => setEditSong(s=>({...s,[f]:v}));
 
-  const deleteSong = async (id) => {
-    if (confirm("Remove this song?")) {
-      await deleteDoc(doc(db, "songs", String(id)));
-    }
-  };
-
-  // Save an inline field change (quality slider, volume toggle, notes)
-  // directly to Firestore so it syncs in real time across devices
-  const saveInlineField = async (song, field, value) => {
-    const updated = { ...song, [field]: value };
-    await setDoc(doc(db, "songs", String(song.id)), updated);
-  };
-
-  // ── Stats ─────────────────────────────────────────────────────────────
+  // ── Stats ────────────────────────────────────────────────────────────
   const stats = useMemo(() => ({
-    total:  songs.length,
-    ready:  songs.filter(s => s.quality >= 8).length,
-    avgQ:   songs.length ? (songs.reduce((a, s) => a + s.quality, 0) / songs.length).toFixed(1) : "—",
-    volYes: songs.filter(s => s.adjustableVolume).length,
+    total: songs.length,
+    ready: songs.filter(s=>s.quality>=8).length,
+    avgQ: songs.length ? (songs.reduce((a,s)=>a+s.quality,0)/songs.length).toFixed(1) : "—",
+    volYes: songs.filter(s=>s.adjustableVolume).length,
   }), [songs]);
 
-  // ── Shared styles ──────────────────────────────────────────────────────
+  // ── Shared styles ────────────────────────────────────────────────────
   const btnPrimary = { background:tk.accent, color:"#fff", border:"none", borderRadius:12, padding:isMobile?"12px 20px":"10px 20px", fontSize:15, fontWeight:600, cursor:"pointer", fontFamily:"inherit", WebkitTapHighlightColor:"transparent", letterSpacing:-0.2 };
   const btnGhost   = { background:"none", border:`1.5px solid ${tk.borderStrong}`, color:tk.text, borderRadius:12, padding:isMobile?"12px 18px":"10px 18px", fontSize:14, fontWeight:500, cursor:"pointer", fontFamily:"inherit", WebkitTapHighlightColor:"transparent" };
 
   return (
     <>
       <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@300;400;500;600;700&display=swap');
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap');
         *{box-sizing:border-box;margin:0;padding:0;}
         html{-webkit-text-size-adjust:100%;}
@@ -212,6 +191,7 @@ export default function App() {
         {/* ══ HEADER ══ */}
         <header style={{position:"sticky",top:0,zIndex:100,background:tk.header,backdropFilter:"blur(24px)",WebkitBackdropFilter:"blur(24px)",borderBottom:`1px solid ${tk.border}`}}>
           <div style={{maxWidth:900,margin:"0 auto",padding:`0 ${isMobile?16:28}px`,height:isMobile?54:62,display:"flex",alignItems:"center",gap:12}}>
+            {/* Logo */}
             <div style={{width:36,height:36,borderRadius:10,background:`linear-gradient(145deg,${tk.accent},${tk.a2})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0,boxShadow:`0 3px 10px ${tk.accent}44`}}>🎵</div>
             <div style={{flex:1}}>
               <div style={{fontSize:isMobile?16:18,fontWeight:700,letterSpacing:-0.5,color:tk.text,lineHeight:1}}>Set List</div>
@@ -229,20 +209,13 @@ export default function App() {
         {/* ══ MAIN ══ */}
         <main style={{maxWidth:900,margin:"0 auto",padding:isMobile?`20px 14px 100px`:"28px 28px 60px"}}>
 
-          {/* Loading state */}
-          {loading && (
-            <div style={{textAlign:"center",padding:"60px 0",color:tk.textSub,fontSize:15}}>Loading your set list…</div>
-          )}
-
-          {!loading && <>
-
           {/* ── Stats row ── */}
           <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:isMobile?8:12,marginBottom:isMobile?20:24}} className="animate-up">
             {[
-              { label:"Songs",          value:stats.total  },
-              { label:"Stage Ready",    value:stats.ready  },
-              { label:"Avg Quality",    value:stats.avgQ   },
-              { label:"Adjustable Vol", value:stats.volYes },
+              { label:"Songs",         value:stats.total },
+              { label:"Stage Ready",   value:stats.ready },
+              { label:"Avg Quality",   value:stats.avgQ  },
+              { label:"Adjustable Vol",value:stats.volYes},
             ].map((s,i) => (
               <div key={i} style={{background:tk.surface,borderRadius:isMobile?14:16,padding:isMobile?"14px 10px":"18px 18px",border:`1px solid ${tk.border}`,boxShadow:tk.shadowCard,textAlign:"center"}}>
                 <div style={{fontSize:isMobile?22:28,fontWeight:700,color:tk.accent,letterSpacing:-0.5,lineHeight:1}}>{s.value}</div>
@@ -268,7 +241,7 @@ export default function App() {
               </select>
             </div>
 
-            {/* Filter pills */}
+            {/* Filter pills row */}
             <div style={{display:"flex",flexDirection:isMobile?"column":"row",gap:10}}>
               {/* Volume filter */}
               <div style={{display:"flex",gap:6,alignItems:"center"}}>
@@ -288,13 +261,13 @@ export default function App() {
                 <span style={{fontSize:11,fontWeight:600,color:tk.textSub,textTransform:"uppercase",letterSpacing:0.4,whiteSpace:"nowrap",minWidth:isMobile?60:undefined}}>Stage</span>
                 <div style={{display:"flex",gap:6}}>
                   {[
-                    {v:"all",       l:"All",       color:null},
-                    {v:"notready",  l:"Not Ready", color:STAGE_COLORS.notready},
-                    {v:"needswork", l:"Needs Work",color:STAGE_COLORS.needswork},
-                    {v:"ready",     l:"Ready",     color:STAGE_COLORS.ready},
-                  ].map(o => {
-                    const active = filterStage === o.v;
-                    const c = o.color || tk.accent;
+                    {v:"all",      l:"All",        color:null},
+                    {v:"notready", l:"Not Ready",  color:STAGE_COLORS.notready},
+                    {v:"needswork",l:"Needs Work", color:STAGE_COLORS.needswork},
+                    {v:"ready",    l:"Ready",      color:STAGE_COLORS.ready},
+                  ].map(o=>{
+                    const active = filterStage===o.v;
+                    const c = o.color || STAGE_COLORS.ready;
                     return (
                       <button key={o.v} className="pill-btn" onClick={()=>setFilterStage(o.v)}
                         style={{padding:"7px 12px",borderRadius:10,border:`1.5px solid ${active?(o.color||tk.accent):tk.borderStrong}`,background:active?(c+"18"):"none",color:active?c:tk.textSub,fontSize:12,fontWeight:active?600:400,cursor:"pointer",fontFamily:"inherit",whiteSpace:"nowrap",WebkitTapHighlightColor:"transparent"}}>
@@ -330,13 +303,13 @@ export default function App() {
 
                     {/* Quality ring */}
                     <div style={{width:isMobile?42:48,height:isMobile?42:48,borderRadius:"50%",background:`conic-gradient(${qColor} ${song.quality*36}deg, ${dark?"#28282a":"#e5e5ea"} 0deg)`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,position:"relative"}}>
-                      <div style={{width:isMobile?32:36,height:isMobile?32:36,borderRadius:"50%",background:tk.surface,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                      <div style={{width:isMobile?32:36,height:isMobile?32:36,borderRadius:"50%",background:tk.surface,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column"}}>
                         <div style={{fontSize:isMobile?13:14,fontWeight:700,color:qColor,lineHeight:1}}>{song.quality}</div>
                       </div>
                     </div>
 
                     {/* Title / artist */}
-                    <div style={{flex:1,minWidth:0}}>
+                    <div style={{flex:1,minWidth:0,textAlign:"center"}}>
                       <div style={{fontSize:isMobile?15:16,fontWeight:600,color:tk.text,letterSpacing:-0.3,marginBottom:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{song.title}</div>
                       <div style={{fontSize:13,color:tk.textSub,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{song.artist}</div>
                     </div>
@@ -358,7 +331,7 @@ export default function App() {
                     <div className="fade-in" style={{padding:isMobile?"0 14px 16px":"0 20px 18px",borderTop:`1px solid ${tk.border}`}} onClick={e=>e.stopPropagation()}>
                       <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:isMobile?12:16,paddingTop:14}}>
 
-                        {/* Quality slider — saves to Firestore on change */}
+                        {/* Quality slider */}
                         <div style={{background:tk.surface2,borderRadius:14,padding:"14px 16px",border:`1px solid ${tk.border}`}}>
                           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
                             <div style={{fontSize:12,fontWeight:600,color:tk.textSub,textTransform:"uppercase",letterSpacing:0.4}}>Performance Quality</div>
@@ -368,21 +341,20 @@ export default function App() {
                             </div>
                           </div>
                           <input type="range" min={0} max={10} step={1} value={song.quality}
-                            onChange={e => saveInlineField(song, "quality", Number(e.target.value))}
+                            onChange={e=>setSongs(prev=>prev.map(s=>s.id===song.id?{...s,quality:Number(e.target.value)}:s))}
                             style={{accentColor:qColor}}/>
                           <div style={{display:"flex",justifyContent:"space-between",marginTop:4}}>
-                            <span style={{fontSize:10,color:tk.textMuted}}>0 – Not Ready</span>
-                            <span style={{fontSize:10,color:tk.textMuted}}>10 – Ready</span>
+                            <span style={{fontSize:10,color:tk.textMuted}}>0</span>
+                            <span style={{fontSize:10,color:tk.textMuted}}>10</span>
                           </div>
                         </div>
 
-                        {/* Volume toggle — saves to Firestore on change */}
+                        {/* Volume toggle */}
                         <div style={{background:tk.surface2,borderRadius:14,padding:"14px 16px",border:`1px solid ${tk.border}`,display:"flex",flexDirection:"column",justifyContent:"space-between"}}>
                           <div style={{fontSize:12,fontWeight:600,color:tk.textSub,textTransform:"uppercase",letterSpacing:0.4,marginBottom:10}}>Adjustable Volume</div>
                           <div style={{display:"flex",gap:8}}>
                             {[{v:true,l:"🔊 Yes"},{v:false,l:"🔇 No"}].map(o=>(
-                              <button key={String(o.v)}
-                                onClick={()=>saveInlineField(song, "adjustableVolume", o.v)}
+                              <button key={String(o.v)} onClick={()=>setSongs(prev=>prev.map(s=>s.id===song.id?{...s,adjustableVolume:o.v}:s))}
                                 style={{flex:1,padding:"11px 8px",borderRadius:12,border:`2px solid ${song.adjustableVolume===o.v?(o.v?tk.green:tk.red):tk.border}`,background:song.adjustableVolume===o.v?(o.v?tk.green+"18":tk.red+"18"):"none",color:song.adjustableVolume===o.v?(o.v?tk.green:tk.red):tk.textSub,fontSize:13,fontWeight:song.adjustableVolume===o.v?700:400,cursor:"pointer",fontFamily:"inherit",transition:"all 0.15s",WebkitTapHighlightColor:"transparent"}}>
                                 {o.l}
                               </button>
@@ -390,16 +362,16 @@ export default function App() {
                           </div>
                         </div>
 
-                        {/* Notes — saves to Firestore on blur for efficiency */}
-                        <div style={{gridColumn:isMobile?undefined:"1/-1",background:tk.surface2,borderRadius:14,padding:"14px 16px",border:`1px solid ${tk.border}`}}>
-                          <div style={{fontSize:12,fontWeight:600,color:tk.textSub,textTransform:"uppercase",letterSpacing:0.4,marginBottom:8}}>Notes</div>
-                          <textarea
-                            defaultValue={song.notes}
-                            onBlur={e=>saveInlineField(song, "notes", e.target.value)}
-                            placeholder="Performance notes, tips, reminders…"
-                            rows={2}
-                            style={{width:"100%",padding:"9px 12px",border:`1px solid ${tk.inputBorder}`,borderRadius:10,fontSize:14,background:tk.inputBg,color:tk.text,resize:"vertical",fontFamily:"inherit"}}/>
-                        </div>
+                        {/* Notes */}
+                        {(song.notes||true) && (
+                          <div style={{gridColumn:isMobile?undefined:"1/-1",background:tk.surface2,borderRadius:14,padding:"14px 16px",border:`1px solid ${tk.border}`}}>
+                            <div style={{fontSize:12,fontWeight:600,color:tk.textSub,textTransform:"uppercase",letterSpacing:0.4,marginBottom:8}}>Notes</div>
+                            <textarea value={song.notes} onChange={e=>setSongs(prev=>prev.map(s=>s.id===song.id?{...s,notes:e.target.value}:s))}
+                              placeholder="Performance notes, tips, reminders…"
+                              rows={2}
+                              style={{width:"100%",padding:"9px 12px",border:`1px solid ${tk.inputBorder}`,borderRadius:10,fontSize:14,background:tk.inputBg,color:tk.text,resize:"vertical",fontFamily:"inherit"}}/>
+                          </div>
+                        )}
                       </div>
 
                       {/* Row actions */}
@@ -417,8 +389,6 @@ export default function App() {
           {displayed.length > 0 && (
             <div style={{textAlign:"center",marginTop:14,fontSize:12,color:tk.textMuted}}>{displayed.length} of {songs.length} songs</div>
           )}
-
-          </>}
         </main>
 
         {/* ══ ADD / EDIT MODAL ══ */}
@@ -504,6 +474,7 @@ export default function App() {
                 <button onClick={()=>setShowSettings(false)} style={{background:tk.surface2,border:"none",color:tk.textSub,cursor:"pointer",width:28,height:28,borderRadius:"50%",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"inherit"}}>✕</button>
               </div>
 
+              {/* Mode */}
               <div style={{fontSize:11,fontWeight:600,color:tk.textSub,textTransform:"uppercase",letterSpacing:0.5,marginBottom:10}}>Appearance Mode</div>
               <div style={{display:"flex",gap:10,marginBottom:24}}>
                 {[{l:"☀️  Light",v:false},{l:"🌙  Dark",v:true}].map(o=>(
@@ -511,6 +482,7 @@ export default function App() {
                 ))}
               </div>
 
+              {/* Accent presets */}
               <div style={{fontSize:11,fontWeight:600,color:tk.textSub,textTransform:"uppercase",letterSpacing:0.5,marginBottom:10}}>Accent Color</div>
               <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:14}}>
                 {ACCENTS.map(a=>(
@@ -522,6 +494,7 @@ export default function App() {
                 ))}
               </div>
 
+              {/* Custom color */}
               <div style={{background:tk.surface2,borderRadius:14,padding:"14px 16px",marginBottom:24,border:`1px solid ${tk.border}`}}>
                 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
                   <div>
