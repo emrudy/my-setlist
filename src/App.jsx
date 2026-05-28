@@ -309,7 +309,7 @@ export default function App() {
                     </div>
 
                     {/* Title / artist */}
-                    <div style={{flex:1,minWidth:0,textAlign:"center"}}>
+                    <div style={{flex:1,minWidth:0,textAlign:"left"}}>
                       <div style={{fontSize:isMobile?15:16,fontWeight:600,color:tk.text,letterSpacing:-0.3,marginBottom:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{song.title}</div>
                       <div style={{fontSize:13,color:tk.textSub,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{song.artist}</div>
                     </div>
