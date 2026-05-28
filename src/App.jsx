@@ -315,9 +315,9 @@ export default function App() {
                     </div>
 
                     {/* Badges */}
-                    <div style={{display:"flex",gap:6,alignItems:"center",flexShrink:0}}>
+                    <div style={{display:"flex",gap:6,alignItems:"center",flexShrink:0,width:isMobile?undefined:200,justifyContent:"flex-end"}}>
                       {!isMobile && (
-                        <div style={{fontSize:11,fontWeight:600,color:qColor,background:qColor+"1a",borderRadius:20,padding:"3px 10px",letterSpacing:0.1,whiteSpace:"nowrap"}}>{qualityLabel(song.quality)}</div>
+                        <div style={{fontSize:11,fontWeight:600,color:qColor,background:qColor+"1a",borderRadius:20,padding:"3px 10px",letterSpacing:0.1,whiteSpace:"nowrap",minWidth:90,textAlign:"center"}}>{qualityLabel(song.quality)}</div>
                       )}
                       <div style={{fontSize:11,fontWeight:500,color:song.adjustableVolume?tk.green:tk.textMuted,background:song.adjustableVolume?tk.green+"18":tk.surface3,borderRadius:20,padding:"3px 10px",whiteSpace:"nowrap"}}>
                         {song.adjustableVolume?"🔊 Adj":"🔇 Fixed"}
