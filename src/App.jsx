@@ -372,10 +372,10 @@ export default function App() {
                     </div>
 
                     {/* Title / artist */}
-                    <div style={{minWidth:0}}>
-                      <div style={{fontSize:isMobile?15:16,fontWeight:600,color:tk.text,letterSpacing:-0.3,marginBottom:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{song.title}</div>
-                      <div style={{display:"flex",alignItems:"center",gap:8}}>
-                        <div style={{fontSize:13,color:tk.textSub,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{song.artist}</div>
+                    <div style={{minWidth:0,display:"flex",flexDirection:"column",alignItems:"flex-start",justifyContent:"center"}}>
+                      <div style={{fontSize:isMobile?15:16,fontWeight:600,color:tk.text,letterSpacing:-0.3,marginBottom:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",width:"100%",textAlign:"left"}}>{song.title}</div>
+                      <div style={{display:"flex",alignItems:"center",gap:8,width:"100%"}}>
+                        <div style={{fontSize:13,color:tk.textSub,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",textAlign:"left"}}>{song.artist}</div>
                         {hasDuration && <div style={{fontSize:11,color:tk.textMuted,flexShrink:0}}>⏱ {song.duration}</div>}
                         {hasYT && <div style={{fontSize:11,color:tk.green,flexShrink:0}}>▶ Preview</div>}
                       </div>
