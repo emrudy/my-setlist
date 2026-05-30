@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { db } from "./firebase";
 import { collection, onSnapshot, doc, setDoc, deleteDoc } from "firebase/firestore";
 
@@ -189,7 +189,70 @@ export default function App() {
     await setDoc(doc(db, "songs", String(song.id)), updated);
   };
 
-  // ── Stats ─────────────────────────────────────────────────────────────
+  // ── CSV Import ────────────────────────────────────────────────────────
+  const [importing, setImporting] = useState(false);
+  const importInputRef = useRef(null);
+
+  const handleImport = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      const text = ev.target.result;
+      const lines = text.trim().split("\n");
+      if (lines.length < 2) return alert("CSV file appears to be empty.");
+
+      // Parse header row — case insensitive
+      const headers = lines[0].split(",").map(h => h.trim().toLowerCase().replace(/"/g, ""));
+      const titleIdx    = headers.indexOf("title");
+      const artistIdx   = headers.indexOf("artist");
+      const durationIdx = headers.indexOf("duration");
+
+      if (titleIdx === -1) return alert("CSV must have a 'title' column.");
+
+      const newSongs = [];
+      for (let i = 1; i < lines.length; i++) {
+        const cols = lines[i].split(",").map(c => c.trim().replace(/^"|"$/g, ""));
+        const title = cols[titleIdx]?.trim();
+        if (!title) continue;
+        newSongs.push({
+          id: String(Date.now() + i),
+          title,
+          artist:           artistIdx   !== -1 ? (cols[artistIdx]?.trim()   || "") : "",
+          duration:         durationIdx !== -1 ? (cols[durationIdx]?.trim() || "") : "",
+          quality:          7,
+          adjustableVolume: true,
+          notes:            "",
+        });
+      }
+
+      if (newSongs.length === 0) return alert("No valid songs found in CSV.");
+
+      const confirmed = confirm(
+        `This will DELETE all ${songs.length} existing songs and replace them with ${newSongs.length} songs from your CSV.\n\nThis cannot be undone. Continue?`
+      );
+      if (!confirmed) { e.target.value = ""; return; }
+
+      setImporting(true);
+      try {
+        // Delete all existing songs
+        for (const s of songs) {
+          await deleteDoc(doc(db, "songs", String(s.id)));
+        }
+        // Add all new songs
+        for (const s of newSongs) {
+          await setDoc(doc(db, "songs", String(s.id)), s);
+        }
+        alert(`✓ Successfully imported ${newSongs.length} songs!`);
+      } catch(err) {
+        console.error("Import failed", err);
+        alert("Import failed. Please try again.");
+      }
+      setImporting(false);
+      e.target.value = "";
+    };
+    reader.readAsText(file);
+  };
   const stats = useMemo(() => ({
     total:    songs.length,
     ready:    songs.filter(s => s.quality >= 8).length,
@@ -239,7 +302,22 @@ export default function App() {
             </div>
             <div style={{display:"flex",gap:8,alignItems:"center"}}>
               {!isMobile && (
-                <button onClick={openNew} style={{...btnPrimary,padding:"8px 18px",borderRadius:20,fontSize:14}}>+ Add Song</button>
+                <>
+                  <input
+                    ref={importInputRef}
+                    type="file"
+                    accept=".csv"
+                    style={{display:"none"}}
+                    onChange={handleImport}
+                  />
+                  <button
+                    onClick={()=>importInputRef.current?.click()}
+                    disabled={importing}
+                    style={{...btnGhost,padding:"8px 16px",borderRadius:20,fontSize:14,opacity:importing?0.6:1}}>
+                    {importing?"Importing…":"↑ Import CSV"}
+                  </button>
+                  <button onClick={openNew} style={{...btnPrimary,padding:"8px 18px",borderRadius:20,fontSize:14}}>+ Add Song</button>
+                </>
               )}
               <button onClick={()=>setShowSettings(true)} className="icon-btn" style={{width:36,height:36,borderRadius:10,border:`1px solid ${tk.border}`,background:"none",cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center",transition:"background 0.12s",WebkitTapHighlightColor:"transparent"}}>⚙️</button>
             </div>
@@ -555,6 +633,10 @@ export default function App() {
             <button onClick={openNew} style={{flex:1,background:"none",border:"none",cursor:"pointer",padding:"10px 0 8px",display:"flex",flexDirection:"column",alignItems:"center",gap:3,fontFamily:"inherit",WebkitTapHighlightColor:"transparent"}}>
               <div style={{width:42,height:42,borderRadius:"50%",background:`linear-gradient(135deg,${tk.accent},${tk.a2})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,color:"#fff",marginTop:-18,boxShadow:`0 4px 16px ${tk.accent}55`}}>+</div>
               <span style={{fontSize:10,color:tk.textSub,letterSpacing:0.2,marginTop:2}}>Add Song</span>
+            </button>
+            <button onClick={()=>{ importInputRef.current?.click(); }} style={{flex:1,background:"none",border:"none",cursor:"pointer",padding:"10px 0 8px",display:"flex",flexDirection:"column",alignItems:"center",gap:3,fontFamily:"inherit",WebkitTapHighlightColor:"transparent"}}>
+              <span style={{fontSize:22,lineHeight:1}}>↑</span>
+              <span style={{fontSize:10,color:tk.textSub,letterSpacing:0.2}}>Import</span>
             </button>
             <button onClick={()=>setShowSettings(true)} style={{flex:1,background:"none",border:"none",cursor:"pointer",padding:"10px 0 8px",display:"flex",flexDirection:"column",alignItems:"center",gap:3,fontFamily:"inherit",WebkitTapHighlightColor:"transparent"}}>
               <span style={{fontSize:22,lineHeight:1}}>⚙️</span>
