@@ -40,7 +40,6 @@ const qualityColor = (q) => {
 };
 
 // ── Duration helpers ───────────────────────────────────────────────────────
-// Parse "m:ss" or "mm:ss" → total seconds
 const parseDuration = (s) => {
   if (!s) return 0;
   const parts = s.split(":").map(Number);
@@ -48,9 +47,8 @@ const parseDuration = (s) => {
   return 0;
 };
 
-// Validate duration format
 const isValidDuration = (s) => {
-  if (!s) return true; // empty is fine
+  if (!s) return true;
   return /^\d{1,2}:[0-5]\d$/.test(s);
 };
 
@@ -168,8 +166,8 @@ export default function App() {
   }, [songs, search, sortBy, filterVolume, filterStage]);
 
   // ── Song CRUD ─────────────────────────────────────────────────────────
-  const openNew  = () => { setEditSong({ id:newId(), title:"", artist:"", adjustableVolume:true, quality:7, notes:"", duration:"", youtubeUrl:"" }); setShowForm(true); };
-  const openEdit = (s) => { setEditSong({...s, duration:s.duration||"", youtubeUrl:s.youtubeUrl||""}); setShowForm(true); };
+  const openNew  = () => { setEditSong({ id:newId(), title:"", artist:"", adjustableVolume:true, quality:7, notes:"", duration:"" }); setShowForm(true); };
+  const openEdit = (s) => { setEditSong({...s, duration:s.duration||""}); setShowForm(true); };
   const updEdit  = (f, v) => setEditSong(s => ({ ...s, [f]: v }));
 
   const saveSong = async () => {
@@ -197,8 +195,6 @@ export default function App() {
     ready:    songs.filter(s => s.quality >= 8).length,
     avgQ:     songs.length ? (songs.reduce((a, s) => a + s.quality, 0) / songs.length).toFixed(1) : "—",
     volYes:   songs.filter(s => s.adjustableVolume).length,
-    withDur:  songs.filter(s => s.duration).length,
-    withYT:   songs.filter(s => s.youtubeUrl).length,
   }), [songs]);
 
   const btnPrimary = { background:tk.accent, color:"#fff", border:"none", borderRadius:12, padding:isMobile?"12px 20px":"10px 20px", fontSize:15, fontWeight:600, cursor:"pointer", fontFamily:"inherit", WebkitTapHighlightColor:"transparent", letterSpacing:-0.2 };
@@ -262,10 +258,10 @@ export default function App() {
           {/* ── Stats row ── */}
           <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:isMobile?8:12,marginBottom:isMobile?20:24}} className="animate-up">
             {[
-              { label:"Songs",          value:stats.total   },
-              { label:"Stage Ready",    value:stats.ready   },
-              { label:"Avg Quality",    value:stats.avgQ    },
-              { label:"Adjustable Vol", value:stats.volYes  },
+              { label:"Songs",          value:stats.total  },
+              { label:"Stage Ready",    value:stats.ready  },
+              { label:"Avg Quality",    value:stats.avgQ   },
+              { label:"Adjustable Vol", value:stats.volYes },
             ].map((s,i) => (
               <div key={i} style={{background:tk.surface,borderRadius:isMobile?14:16,padding:isMobile?"14px 10px":"18px 18px",border:`1px solid ${tk.border}`,boxShadow:tk.shadowCard,textAlign:"center"}}>
                 <div style={{fontSize:isMobile?22:28,fontWeight:700,color:tk.accent,letterSpacing:-0.5,lineHeight:1}}>{s.value}</div>
@@ -273,21 +269,6 @@ export default function App() {
               </div>
             ))}
           </div>
-
-          {/* ── Progress banner — shows how many songs still need duration/YouTube ── */}
-          {(stats.withDur < stats.total || stats.withYT < stats.total) && (
-            <div style={{background:tk.accent+"12",border:`1px solid ${tk.accent}30`,borderRadius:14,padding:"12px 16px",marginBottom:16,display:"flex",gap:10,alignItems:"center"}} className="animate-up">
-              <span style={{fontSize:18}}>📋</span>
-              <div>
-                <div style={{fontSize:13,fontWeight:600,color:tk.accent,marginBottom:2}}>Client Form Setup Progress</div>
-                <div style={{fontSize:12,color:tk.textSub}}>
-                  {stats.total - stats.withDur > 0 && `${stats.total - stats.withDur} song${stats.total-stats.withDur>1?"s":""} missing duration. `}
-                  {stats.total - stats.withYT > 0 && `${stats.total - stats.withYT} song${stats.total-stats.withYT>1?"s":""} missing YouTube preview.`}
-                  {" "}Edit each song to fill these in.
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* ── Search + Filters ── */}
           <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:16}} className="animate-up">
@@ -355,7 +336,6 @@ export default function App() {
               const isExpanded = expandedId === song.id;
               const qColor = qualityColor(song.quality);
               const hasDuration = !!song.duration;
-              const hasYT = !!song.youtubeUrl;
               return (
                 <div key={song.id} className="song-row"
                   style={{borderBottom:idx<displayed.length-1?`1px solid ${tk.border}`:"none",transition:"background 0.12s",cursor:"pointer"}}
@@ -377,7 +357,6 @@ export default function App() {
                       <div style={{display:"flex",alignItems:"center",gap:8,width:"100%"}}>
                         <div style={{fontSize:13,color:tk.textSub,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",textAlign:"left"}}>{song.artist}</div>
                         {hasDuration && <div style={{fontSize:11,color:tk.textMuted,flexShrink:0}}>⏱ {song.duration}</div>}
-                        {hasYT && <div style={{fontSize:11,color:tk.green,flexShrink:0}}>▶ Preview</div>}
                       </div>
                     </div>
 
@@ -430,21 +409,6 @@ export default function App() {
                           </div>
                         </div>
 
-                        {/* YouTube preview */}
-                        {song.youtubeUrl && (
-                          <div style={{gridColumn:isMobile?undefined:"1/-1",background:tk.surface2,borderRadius:14,padding:"14px 16px",border:`1px solid ${tk.border}`}}>
-                            <div style={{fontSize:12,fontWeight:600,color:tk.textSub,textTransform:"uppercase",letterSpacing:0.4,marginBottom:10}}>YouTube Preview</div>
-                            <div style={{position:"relative",paddingBottom:"56.25%",height:0,borderRadius:10,overflow:"hidden"}}>
-                              <iframe
-                                src={`https://www.youtube.com/embed/${getYouTubeId(song.youtubeUrl)}`}
-                                style={{position:"absolute",top:0,left:0,width:"100%",height:"100%",border:"none",borderRadius:10}}
-                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                allowFullScreen
-                              />
-                            </div>
-                          </div>
-                        )}
-
                         {/* Notes */}
                         <div style={{gridColumn:isMobile?undefined:"1/-1",background:tk.surface2,borderRadius:14,padding:"14px 16px",border:`1px solid ${tk.border}`}}>
                           <div style={{fontSize:12,fontWeight:600,color:tk.textSub,textTransform:"uppercase",letterSpacing:0.4,marginBottom:8}}>Notes</div>
@@ -489,43 +453,7 @@ export default function App() {
 
               <Field label="Song Title" value={editSong.title} onChange={v=>updEdit("title",v)} placeholder="e.g. Canon in D" required tk={tk} isMobile={isMobile}/>
               <Field label="Artist / Composer" value={editSong.artist} onChange={v=>updEdit("artist",v)} placeholder="e.g. Pachelbel" tk={tk} isMobile={isMobile}/>
-
-              {/* Duration + YouTube side by side on desktop */}
-              <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:12,marginBottom:4}}>
-                <Field
-                  label="Duration"
-                  value={editSong.duration}
-                  onChange={v=>updEdit("duration",v)}
-                  placeholder="e.g. 3:45"
-                  tk={tk}
-                  isMobile={isMobile}
-                  hint="mm:ss"
-                />
-                <div style={{marginBottom:12}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:6}}>
-                    <label style={{display:"block",fontSize:12,fontWeight:600,color:tk.textSub,textTransform:"uppercase",letterSpacing:0.4}}>YouTube URL</label>
-                    <span style={{fontSize:11,color:tk.textMuted}}>for client preview</span>
-                  </div>
-                  <input
-                    value={editSong.youtubeUrl}
-                    onChange={e=>updEdit("youtubeUrl",e.target.value)}
-                    placeholder="https://youtube.com/watch?v=..."
-                    style={{width:"100%",padding:isMobile?"11px 13px":"9px 12px",border:`1px solid ${tk.inputBorder}`,borderRadius:10,fontSize:16,background:tk.inputBg,color:tk.text,fontFamily:"inherit"}}
-                  />
-                </div>
-              </div>
-
-              {/* YouTube preview inside modal */}
-              {editSong.youtubeUrl && getYouTubeId(editSong.youtubeUrl) && (
-                <div style={{marginBottom:14,borderRadius:12,overflow:"hidden",position:"relative",paddingBottom:"40%",height:0,background:tk.surface3}}>
-                  <iframe
-                    src={`https://www.youtube.com/embed/${getYouTubeId(editSong.youtubeUrl)}`}
-                    style={{position:"absolute",top:0,left:0,width:"100%",height:"100%",border:"none"}}
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                  />
-                </div>
-              )}
+              <Field label="Duration" value={editSong.duration} onChange={v=>updEdit("duration",v)} placeholder="e.g. 3:45" tk={tk} isMobile={isMobile} hint="mm:ss"/>
 
               {/* Quality */}
               <div style={{marginBottom:14,background:tk.surface2,borderRadius:14,padding:"14px 16px",border:`1px solid ${tk.border}`}}>
@@ -638,19 +566,4 @@ export default function App() {
       </div>
     </>
   );
-}
-
-// ── YouTube URL → video ID ─────────────────────────────────────────────────
-function getYouTubeId(url) {
-  if (!url) return null;
-  const patterns = [
-    /[?&]v=([^&#]+)/,
-    /youtu\.be\/([^?&#]+)/,
-    /youtube\.com\/embed\/([^?&#]+)/,
-  ];
-  for (const p of patterns) {
-    const m = url.match(p);
-    if (m) return m[1];
-  }
-  return null;
 }
